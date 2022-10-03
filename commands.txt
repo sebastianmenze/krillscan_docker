@@ -1,0 +1,9 @@
+
+
+chdir C:\Users\a5278\Documents\postdoc_krill\krillscan\krillscan_edgesever
+
+
+docker build -t krillscan .
+
+
+docker run -d --name krillscan -v D:\2022807-ANTARCTIC-PROVIDER:/source_folder -v C:\Users\a5278\Documents\postdoc_krill\krillscan\krillscan_edgesever\target_folder:/target_folder krillscan 
