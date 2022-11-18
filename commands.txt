@@ -1,9 +1,16 @@
 
 
-chdir C:\Users\a5278\Documents\postdoc_krill\krillscan\krillscan_edgesever
+chdir C:\Users\a5278\Documents\postdoc_krill\krillscan\krillscan_edgesever 3
 
 
 docker build -t krillscan .
 
 
-docker run -d --name krillscan -v D:\2022807-ANTARCTIC-PROVIDER:/source_folder -v C:\Users\a5278\Documents\postdoc_krill\krillscan\krillscan_edgesever\target_folder:/target_folder krillscan 
+docker run -d --name krillscan -v C:\Users\a5278\Documents\postdoc_krill\krillscan\source_folder:/source_folder -v C:\Users\a5278\Documents\postdoc_krill\krillscan\target_folder:/target_folder krillscan 
+
+
+
+
+docker build -t sebastianmenze/krillscan .
+
+docker push sebastianmenze/krillscan:latest

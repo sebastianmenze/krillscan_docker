@@ -101,7 +101,7 @@ class krillscan():
         self.workpath = 'target_folder'
         print(os.getcwd())
         
-        os.chdir(self.workpath)
+        # os.chdir(self.workpath)
         
 
         self.timer_process = RepeatTimer(1, self.callback_process_raw)
@@ -182,79 +182,81 @@ class krillscan():
         f=float(self.config['GENERAL']['transducer_frequency'])
         print(raw_freq)
      
-        raw_data = raw_obj.raw_data[raw_obj.frequency_map[f][0]][0]                   
-        cal_obj = raw_data.get_calibration()
-        
-        try: 
-           cal_obj.gain=float(self.config['CALIBRATION']['gain']       )
-        except:
-            pass
-        try: 
-           cal_obj.sa_correction=float(self.config['CALIBRATION']['sa_correction']       )
-        except:
-            pass
-        try: 
-           cal_obj.beam_width_alongship=float(self.config['CALIBRATION']['beam_width_alongship']       )
-        except:
-            pass
-        try: 
-           cal_obj.beam_width_athwartship=float(self.config['CALIBRATION']['beam_width_athwartship']       )
-        except:
-            pass
-        try: 
-           cal_obj.angle_offset_alongship=float(self.config['CALIBRATION']['angle_offset_alongship']       )
-        except:
-            pass
-        try: 
-           cal_obj.angle_offset_athwartship=float(self.config['CALIBRATION']['angle_offset_athwartship']       )
-        except:
-            pass
+        raw_data = raw_obj.raw_data[raw_obj.frequency_map[f][0]][0]  
+
+        if np.shape(raw_data)[0]>1:                     
+            cal_obj = raw_data.get_calibration()
             
-        
-        sv_obj = raw_data.get_sv(calibration = cal_obj)    
-          
-        positions =pd.DataFrame(  raw_obj.nmea_data.interpolate(sv_obj, 'GGA')[1] )
-       
-        svr = np.transpose( 10*np.log10( sv_obj.data ) )
-        
-        # print(svr)
-
-       
-        # r=np.arange( sv_obj.range.min() , sv_obj.range.max() , 0.5 )
-        r=np.arange( 0 , sv_obj.range.max() , 0.5 )
-
-        t=sv_obj.ping_time
-
-        sv=  resize(svr,[ len(r) , len(t) ] )
-
-       # print(sv.shape)
-       
-        # estimate and correct background noise       
-        p         = np.arange(len(t))                
-        s         = np.arange(len(r))          
-        bn, m120bn_ = gBN.derobertis(sv, s, p, 5, 20, r, np.mean(cal_obj.absorption_coefficient) ) # whats correct absoprtion?
-        b=pd.DataFrame(bn)
-        bn=  b.interpolate(axis=1).interpolate(axis=0).values                        
-        sv_clean     = tf.log(tf.lin(sv) - tf.lin(bn))
-
-     # -------------------------------------------------------------------------
-     # mask low signal-to-noise 
-        msn             = mSN.derobertis(sv_clean, bn, thr=12)
-        sv_clean[msn] = np.nan
-
-    # get mask for seabed
-        mb = mSB.ariza(sv, r, r0=20, r1=1000, roff=0,
-                          thr=-38, ec=1, ek=(3,3), dc=10, dk=(5,15))
-        sv_clean[mb]=-999
-                             
-        df_sv=pd.DataFrame( np.transpose(sv_clean) )
-        df_sv.index=t
-        df_sv.columns=r
-        
-        # print(df_sv)
-        # print(positions)
+            try: 
+               cal_obj.gain=float(self.config['CALIBRATION']['gain']       )
+            except:
+                pass
+            try: 
+               cal_obj.sa_correction=float(self.config['CALIBRATION']['sa_correction']       )
+            except:
+                pass
+            try: 
+               cal_obj.beam_width_alongship=float(self.config['CALIBRATION']['beam_width_alongship']       )
+            except:
+                pass
+            try: 
+               cal_obj.beam_width_athwartship=float(self.config['CALIBRATION']['beam_width_athwartship']       )
+            except:
+                pass
+            try: 
+               cal_obj.angle_offset_alongship=float(self.config['CALIBRATION']['angle_offset_alongship']       )
+            except:
+                pass
+            try: 
+               cal_obj.angle_offset_athwartship=float(self.config['CALIBRATION']['angle_offset_athwartship']       )
+            except:
+                pass
+                
+            
+            sv_obj = raw_data.get_sv(calibration = cal_obj)    
+              
+            positions =pd.DataFrame(  raw_obj.nmea_data.interpolate(sv_obj, 'GGA')[1] )
            
-        return df_sv, positions
+            svr = np.transpose( 10*np.log10( sv_obj.data ) )
+            
+            # print(svr)
+    
+           
+            # r=np.arange( sv_obj.range.min() , sv_obj.range.max() , 0.5 )
+            r=np.arange( 0 , sv_obj.range.max() , 0.5 )
+    
+            t=sv_obj.ping_time
+    
+            sv=  resize(svr,[ len(r) , len(t) ] )
+    
+           # print(sv.shape)
+           
+            # estimate and correct background noise       
+            p         = np.arange(len(t))                
+            s         = np.arange(len(r))          
+            bn, m120bn_ = gBN.derobertis(sv, s, p, 5, 20, r, np.mean(cal_obj.absorption_coefficient) ) # whats correct absoprtion?
+            b=pd.DataFrame(bn)
+            bn=  b.interpolate(axis=1).interpolate(axis=0).values                        
+            sv_clean     = tf.log(tf.lin(sv) - tf.lin(bn))
+    
+         # -------------------------------------------------------------------------
+         # mask low signal-to-noise 
+            msn             = mSN.derobertis(sv_clean, bn, thr=12)
+            sv_clean[msn] = np.nan
+    
+        # get mask for seabed
+            mb = mSB.ariza(sv, r, r0=20, r1=1000, roff=0,
+                              thr=-38, ec=1, ek=(3,3), dc=10, dk=(5,15))
+            sv_clean[mb]=-999
+                                 
+            df_sv=pd.DataFrame( np.transpose(sv_clean) )
+            df_sv.index=t
+            df_sv.columns=r
+            
+            # print(df_sv)
+            # print(positions)
+               
+            return df_sv, positions
 
     def callback_process_raw(self):
               
@@ -270,6 +272,7 @@ class krillscan():
     
         new_df_files = pd.DataFrame([])           
         new_df_files['path'] = glob.glob( os.path.join( self.folder_source,'*.raw') )  
+        print('found '+str(len(new_df_files)) + ' raw files')
     
         dates=[]
         for fname in new_df_files['path']:
@@ -288,14 +291,13 @@ class krillscan():
         self.df_files =  self.df_files.sort_values('date')
         self.df_files=self.df_files.reset_index(drop=True)
         
-        print('found '+str(len(self.df_files)) + ' raw files')
      
         
         # look for already processed data
         self.df_files['to_do']=True    
         
-        if os.path.isfile('list_of_rawfiles.csv'):
-            df_files_done =  pd.read_csv('list_of_rawfiles.csv',index_col=0)
+        if os.path.isfile(self.workpath+'/list_of_rawfiles.csv'):
+            df_files_done =  pd.read_csv(self.workpath+'/list_of_rawfiles.csv',index_col=0)
             df_files_done=df_files_done.loc[ df_files_done['to_do']==False,: ]
         
             names = self.df_files['path'].apply(lambda x: Path(x).stem)       
@@ -360,21 +362,23 @@ class krillscan():
                         df_sv_swarm[ new_echogram==-999 ] =-999
                         
                                                 
-                        df_nasc_file.to_hdf( name + '_nasctable.h5', key='df', mode='w'  )
+                        df_nasc_file.to_hdf(self.workpath+'/'+ name + '_nasctable.h5', key='df', mode='w'  )
                         
                         dffloat=df_nasc_file.copy()
                         formats = {'lat': "{:.6f}", 'lon': "{:.6f}", 'distance_m': "{:.4f}",'bottomdepth_m': "{:.1f}",'nasc': "{:.2f}"}
                         for col, f in formats.items():
                             dffloat[col] = dffloat[col].map(lambda x: f.format(x))                           
                         # dffloat.to_csv( name + '_nasctable.gzip',compression='gzip' )
-                        dffloat.to_csv( name + '_nasctable.csv')
+                        dffloat.to_csv(self.workpath+'/'+ name + '_nasctable.csv')
                         
-                        df_sv_swarm.astype('float16').to_hdf( name + '_sv_swarm.h5', key='df', mode='w'  )
+                        df_sv_swarm.astype('float16').to_hdf(self.workpath+'/'+ name + '_sv_swarm.h5', key='df', mode='w'  )
                         # self.df_files.loc[i,'to_do'] = False
                         # except Exception as e:
                         #   print(e)                      
                     self.df_files.loc[index,'to_do']=False            
-                    self.df_files.to_csv('list_of_rawfiles.csv')
+                    self.df_files.drop_duplicates(inplace=True)
+                    self.df_files=self.df_files.reset_index(drop=True)
+                    self.df_files.to_csv(self.workpath+'/list_of_rawfiles.csv')
                    
                 except Exception as e:
                     print(e)               
@@ -467,18 +471,24 @@ class krillscan():
         # self.workpath=  os.path.join(self.folder_source,'krill_data')
         
         # os.chdir(self.workpath)
-        
-        nasc_done =  pd.DataFrame( glob.glob( '*_nasctable.h5' ) )
+        # self.df_files=pd.read_csv(self.workpath+'/list_of_rawfiles.csv')
+       
+        nasc_done =  pd.DataFrame( glob.glob( self.workpath+'/*_nasctable.h5' ) )
         if len(nasc_done)>0:               
-            if os.path.isfile('list_of_sent_files.csv'):
-                df_files_sent =  pd.read_csv('list_of_sent_files.csv',index_col=0)
+            if os.path.isfile(self.workpath+'/list_of_sent_files.csv'):
+                df_files_sent =  pd.read_csv(self.workpath+'/list_of_sent_files.csv',index_col=0)
                 ix_done= nasc_done.iloc[:,0].isin( df_files_sent.iloc[:,0]  )  
                 nasc_done=nasc_done[~ix_done]
             
             else:    
                 df_files_sent=pd.DataFrame([])
-                
-            nascfile_times=pd.to_datetime( nasc_done.iloc[:,0] ,format='D%Y%m%d-T%H%M%S_nasctable.h5' )
+            
+            nascfile_times=[]
+            for fname in nasc_done.iloc[:,0]:         
+                datetimestring=re.search('D\d\d\d\d\d\d\d\d-T\d\d\d\d\d\d',fname).group()
+                nascfile_times.append( pd.to_datetime( datetimestring,format='D%Y%m%d-T%H%M%S' ) )
+            
+            # nascfile_times=pd.to_datetime( nasc_done.iloc[:,0] ,format='D%Y%m%d-T%H%M%S_nasctable.h5' )
             nasc_done=nasc_done.iloc[np.argsort(nascfile_times),0].values
                  
             n_files=int(self.config['EMAIL']['files_per_email'])
@@ -495,7 +505,7 @@ class krillscan():
                 msg = MIMEMultipart()
                 msg["From"] = emailfrom
                 msg["To"] = emailto
-                msg["Subject"] = "Krillscan data from "+ self.config['GENERAL']['vessel_name']+' ' +files_to_send[0][0:17]+'_to_'+files_to_send[-1][0:17]
+                msg["Subject"] = "Krillscan data from "+ self.config['GENERAL']['vessel_name']+' ' +files_to_send[0][-30:-13]+'_to_'+files_to_send[-1][-30:-13]
               
                 msgtext = str(dict(self.config['GENERAL']))
                 msg.attach(MIMEText( msgtext   ,'plain'))
@@ -505,15 +515,15 @@ class krillscan():
                 zip.write('settings.ini')
 
                 for fi in files_to_send:   
-                    zip.write(fi)                                  
+                    zip.write(fi,arcname=fi[-30:]  )                                  
 
                 if send_echograms:                       
                     for fi in files_to_send:      
 
                         # fi=        files_to_send.iloc[0,0]
-                        df = pd.read_hdf(fi[0:17] + '_sv_swarm.h5' ,key='df') 
+                        df = pd.read_hdf(self.workpath+'/'+fi[-30:-13] + '_sv_swarm.h5' ,key='df') 
                         df=df.resample(echogram_resolution_in_seconds+'s').mean()
-                        targetname=fi[0:17] + '_sv_swarm_mail.h5' 
+                        targetname=fi[-30:-13] + '_sv_swarm_mail.h5' 
                         df.astype('float16').to_hdf(targetname,key='df',mode='w')
                         # df.astype('float16').to_csv(targetname,compression='gzip')
                         zip.write(targetname)                                                      
@@ -546,7 +556,7 @@ class krillscan():
                         
                     # df_files_sent=df_files_sent.reset_index(drop=True)
                     df_files_sent=df_files_sent.drop_duplicates()
-                    df_files_sent.to_csv('list_of_sent_files.csv')
+                    df_files_sent.to_csv(self.workpath+'/list_of_sent_files.csv')
                     
                     
                     print('email sent: ' +   msg["Subject"] )
