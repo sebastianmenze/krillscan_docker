@@ -335,6 +335,7 @@ class krillscan():
                     
                     self.echogram = pd.concat([ self.echogram,echogram_file ])
                     self.positions = pd.concat([ self.positions,positions_file ])
+                    self.positions=self.positions.reset_index(drop=True)
                     t=self.echogram.index
                     
                     # print(echogram)
@@ -348,33 +349,43 @@ class krillscan():
                         ix_start=t.argmin()
                         # print([ix_start,ix_end])
                         
-                        # accumulate 10 min snippet  
-                        new_echogram = self.echogram.iloc[ix_start:ix_end,:]
-                        new_positions = self.positions.iloc[ix_start:ix_end,:]
-                        self.echogram = self.echogram.iloc[ix_end::,:]
-                        self.positions = self.positions.iloc[ix_end::,:]
-                        t=self.echogram.index
+                        # jump over snipps that are to small
+                        if (ix_end-ix_start)<10:
+                            print('echogram to short, jumping over')
+                            self.echogram = self.echogram.iloc[ix_end+1::,:]
+                            self.positions = self.positions.iloc[ix_end+1::,:]
+                            t=self.echogram.index
 
-                        # try:
-                        df_nasc_file, df_sv_swarm = self.detect_krill_swarms(new_echogram,new_positions)   
-                        name = t.min().strftime('D%Y%m%d-T%H%M%S' )         
+                            
+                        else:    
                         
-                        df_sv_swarm[ new_echogram==-999 ] =-999
-                        
-                                                
-                        df_nasc_file.to_hdf(self.workpath+'/'+ name + '_nasctable.h5', key='df', mode='w'  )
-                        
-                        dffloat=df_nasc_file.copy()
-                        formats = {'lat': "{:.6f}", 'lon': "{:.6f}", 'distance_m': "{:.4f}",'bottomdepth_m': "{:.1f}",'nasc': "{:.2f}"}
-                        for col, f in formats.items():
-                            dffloat[col] = dffloat[col].map(lambda x: f.format(x))                           
-                        # dffloat.to_csv( name + '_nasctable.gzip',compression='gzip' )
-                        dffloat.to_csv(self.workpath+'/'+ name + '_nasctable.csv')
-                        
-                        df_sv_swarm.astype('float16').to_hdf(self.workpath+'/'+ name + '_sv_swarm.h5', key='df', mode='w'  )
-                        # self.df_files.loc[i,'to_do'] = False
-                        # except Exception as e:
-                        #   print(e)                      
+                            # accumulate 10 min snippet  
+                            new_echogram = self.echogram.iloc[ix_start:ix_end,:]
+                            new_positions = self.positions.iloc[ix_start:ix_end,:]
+                            self.echogram = self.echogram.iloc[ix_end::,:]
+                            self.positions = self.positions.iloc[ix_end::,:]
+                            t=self.echogram.index
+    
+                            # try:
+                            df_nasc_file, df_sv_swarm = self.detect_krill_swarms(new_echogram,new_positions)   
+                            name = t.min().strftime('D%Y%m%d-T%H%M%S' )         
+                            
+                            df_sv_swarm[ new_echogram==-999 ] =-999
+                            
+                                                    
+                            df_nasc_file.to_hdf(self.workpath+'/'+ name + '_nasctable.h5', key='df', mode='w'  )
+                            
+                            dffloat=df_nasc_file.copy()
+                            formats = {'lat': "{:.6f}", 'lon': "{:.6f}", 'distance_m': "{:.4f}",'bottomdepth_m': "{:.1f}",'nasc': "{:.2f}"}
+                            for col, f in formats.items():
+                                dffloat[col] = dffloat[col].map(lambda x: f.format(x))                           
+                            # dffloat.to_csv( name + '_nasctable.gzip',compression='gzip' )
+                            dffloat.to_csv(self.workpath+'/'+ name + '_nasctable.csv')
+                            
+                            df_sv_swarm.astype('float16').to_hdf(self.workpath+'/'+ name + '_sv_swarm.h5', key='df', mode='w'  )
+                            # self.df_files.loc[i,'to_do'] = False
+                            # except Exception as e:
+                            #   print(e)                      
                     self.df_files.loc[index,'to_do']=False            
                     self.df_files.drop_duplicates(inplace=True)
                     self.df_files=self.df_files.reset_index(drop=True)
@@ -389,6 +400,7 @@ class krillscan():
     def detect_krill_swarms(self,sv,positions):
          # sv= self.echodata[rawfile][ 120000.0] 
          # sv= self.ekdata[ 120000.0]          
+         # 
          # breakpoint()
               
          t120 =sv.index
@@ -461,110 +473,113 @@ class krillscan():
                 
         emailfrom = self.config['EMAIL']['email_from']
         emailto = self.config['EMAIL']['email_to']
+        password = str(self.config['EMAIL']['pw'])
         # fileToSend = r"D20220212-T180420_nasctable.h5"
         # username = "raw2nasc"
         # password = "raw2nasckrill"
-        password =self.config['EMAIL']['pw']
-        
-        # breakpoint()
-        
-        # self.workpath=  os.path.join(self.folder_source,'krill_data')
-        
-        # os.chdir(self.workpath)
-        # self.df_files=pd.read_csv(self.workpath+'/list_of_rawfiles.csv')
-       
-        nasc_done =  pd.DataFrame( glob.glob( self.workpath+'/*_nasctable.h5' ) )
-        if len(nasc_done)>0:               
-            if os.path.isfile(self.workpath+'/list_of_sent_files.csv'):
-                df_files_sent =  pd.read_csv(self.workpath+'/list_of_sent_files.csv',index_col=0)
-                ix_done= nasc_done.iloc[:,0].isin( df_files_sent.iloc[:,0]  )  
-                nasc_done=nasc_done[~ix_done]
+        # print(self.config['EMAIL']['email_send'])
+        email_send =int(self.config['EMAIL']['email_send'])
+        # print(email_send)
+        if email_send>0:
+            # breakpoint()
             
-            else:    
-                df_files_sent=pd.DataFrame([])
+            # self.workpath=  os.path.join(self.folder_source,'krill_data')
             
-            nascfile_times=[]
-            for fname in nasc_done.iloc[:,0]:         
-                datetimestring=re.search('D\d\d\d\d\d\d\d\d-T\d\d\d\d\d\d',fname).group()
-                nascfile_times.append( pd.to_datetime( datetimestring,format='D%Y%m%d-T%H%M%S' ) )
-            
-            # nascfile_times=pd.to_datetime( nasc_done.iloc[:,0] ,format='D%Y%m%d-T%H%M%S_nasctable.h5' )
-            nasc_done=nasc_done.iloc[np.argsort(nascfile_times),0].values
-                 
-            n_files=int(self.config['EMAIL']['files_per_email'])
-            send_echograms=bool(self.config['EMAIL']['send_echograms'])
-            echogram_resolution_in_seconds=str(self.config['EMAIL']['echogram_resolution_in_seconds'])
-            print( str(len(nasc_done)) +' files that can be sent')
-
-            while (len(nasc_done)>n_files) :
+            # os.chdir(self.workpath)
+            # self.df_files=pd.read_csv(self.workpath+'/list_of_rawfiles.csv')
+           
+            nasc_done =  pd.DataFrame( glob.glob( self.workpath+'/*_nasctable.h5' ) )
+            if len(nasc_done)>0:               
+                if os.path.isfile(self.workpath+'/list_of_sent_files.csv'):
+                    df_files_sent =  pd.read_csv(self.workpath+'/list_of_sent_files.csv',index_col=0)
+                    ix_done= nasc_done.iloc[:,0].isin( df_files_sent.iloc[:,0]  )  
+                    nasc_done=nasc_done[~ix_done]
                 
+                else:    
+                    df_files_sent=pd.DataFrame([])
                 
-                files_to_send=nasc_done[0:n_files]
-                # print(nasc_done)
+                nascfile_times=[]
+                for fname in nasc_done.iloc[:,0]:         
+                    datetimestring=re.search('D\d\d\d\d\d\d\d\d-T\d\d\d\d\d\d',fname).group()
+                    nascfile_times.append( pd.to_datetime( datetimestring,format='D%Y%m%d-T%H%M%S' ) )
                 
-                msg = MIMEMultipart()
-                msg["From"] = emailfrom
-                msg["To"] = emailto
-                msg["Subject"] = "Krillscan data from "+ self.config['GENERAL']['vessel_name']+' ' +files_to_send[0][-30:-13]+'_to_'+files_to_send[-1][-30:-13]
-              
-                msgtext = str(dict(self.config['GENERAL']))
-                msg.attach(MIMEText( msgtext   ,'plain'))
-
-                loczip = msg["Subject"]+'.zip'
-                zip = zipfile.ZipFile(loczip, "w", zipfile.ZIP_DEFLATED)
-                zip.write('settings.ini')
-
-                for fi in files_to_send:   
-                    zip.write(fi,arcname=fi[-30:]  )                                  
-
-                if send_echograms:                       
-                    for fi in files_to_send:      
-
-                        # fi=        files_to_send.iloc[0,0]
-                        df = pd.read_hdf(self.workpath+'/'+fi[-30:-13] + '_sv_swarm.h5' ,key='df') 
-                        df=df.resample(echogram_resolution_in_seconds+'s').mean()
-                        targetname=fi[-30:-13] + '_sv_swarm_mail.h5' 
-                        df.astype('float16').to_hdf(targetname,key='df',mode='w')
-                        # df.astype('float16').to_csv(targetname,compression='gzip')
-                        zip.write(targetname)                                                      
-                        os.remove(targetname)
-                
-                zip.close()
-                fp = open(loczip, "rb")
-                attachment = MIMEBase('application', 'x-zip')
-                attachment.set_payload(fp.read())
-                fp.close()
-                encoders.encode_base64(attachment)
-                attachment.add_header("Content-Disposition", "attachment", filename=loczip)
-                msg.attach(attachment)    
-                
-                os.remove(loczip)
-
-                try:        
-                    ctx = ssl.create_default_context()
-                    server = smtplib.SMTP_SSL("smtp.gmail.com", port=465, context=ctx)
+                # nascfile_times=pd.to_datetime( nasc_done.iloc[:,0] ,format='D%Y%m%d-T%H%M%S_nasctable.h5' )
+                nasc_done=nasc_done.iloc[np.argsort(nascfile_times),0].values
+                     
+                n_files=int(self.config['EMAIL']['files_per_email'])
+                send_echograms=int(self.config['EMAIL']['send_echograms'])
+                echogram_resolution_in_seconds=str(self.config['EMAIL']['echogram_resolution_in_seconds'])
+                print( str(len(nasc_done)) +' files that can be sent')
+    
+                while (len(nasc_done)>n_files) :
                     
-                    server.login(emailfrom, password)
                     
-                    # print(df_files_sent)
-                
-                    server.sendmail(emailfrom, emailto.split(','), msg.as_string())
-                    if len(df_files_sent)>0:
-                        df_files_sent= pd.concat([pd.Series(df_files_sent.iloc[:,0].values),pd.DataFrame(files_to_send)],ignore_index=True)
-                    else:
-                        df_files_sent=pd.DataFrame(files_to_send)
+                    files_to_send=nasc_done[0:n_files]
+                    # print(nasc_done)
+                    
+                    msg = MIMEMultipart()
+                    msg["From"] = emailfrom
+                    msg["To"] = emailto
+                    msg["Subject"] = "Krillscan data from "+ self.config['GENERAL']['vessel_name']+' ' +files_to_send[0][-30:-13]+'_to_'+files_to_send[-1][-30:-13]
+                  
+                    msgtext = str(dict(self.config['GENERAL']))
+                    msg.attach(MIMEText( msgtext   ,'plain'))
+    
+                    loczip = msg["Subject"]+'.zip'
+                    zip = zipfile.ZipFile(loczip, "w", zipfile.ZIP_DEFLATED)
+                    zip.write('settings.ini')
+    
+                    for fi in files_to_send:   
+                        zip.write(fi,arcname=fi[-30:]  )                                  
+    
+                    if send_echograms>0:                       
+                        for fi in files_to_send:      
+    
+                            # fi=        files_to_send.iloc[0,0]
+                            df = pd.read_hdf(self.workpath+'/'+fi[-30:-13] + '_sv_swarm.h5' ,key='df') 
+                            df=df.resample(echogram_resolution_in_seconds+'s').mean()
+                            targetname=fi[-30:-13] + '_sv_swarm_mail.h5' 
+                            df.astype('float16').to_hdf(targetname,key='df',mode='w')
+                            # df.astype('float16').to_csv(targetname,compression='gzip')
+                            zip.write(targetname)                                                      
+                            os.remove(targetname)
+                    
+                    zip.close()
+                    fp = open(loczip, "rb")
+                    attachment = MIMEBase('application', 'x-zip')
+                    attachment.set_payload(fp.read())
+                    fp.close()
+                    encoders.encode_base64(attachment)
+                    attachment.add_header("Content-Disposition", "attachment", filename=loczip)
+                    msg.attach(attachment)    
+                    
+                    os.remove(loczip)
+    
+                    try:        
+                        ctx = ssl.create_default_context()
+                        server = smtplib.SMTP_SSL("smtp.gmail.com", port=465, context=ctx)
                         
-                    # df_files_sent=df_files_sent.reset_index(drop=True)
-                    df_files_sent=df_files_sent.drop_duplicates()
-                    df_files_sent.to_csv(self.workpath+'/list_of_sent_files.csv')
+                        server.login(emailfrom, password)
+                        
+                        # print(df_files_sent)
                     
-                    
-                    print('email sent: ' +   msg["Subject"] )
-                    nasc_done=nasc_done[n_files::]
-                    server.quit()
-
-                except Exception as e:
-                    print(e)
+                        server.sendmail(emailfrom, emailto.split(','), msg.as_string())
+                        if len(df_files_sent)>0:
+                            df_files_sent= pd.concat([pd.Series(df_files_sent.iloc[:,0].values),pd.DataFrame(files_to_send)],ignore_index=True)
+                        else:
+                            df_files_sent=pd.DataFrame(files_to_send)
+                            
+                        # df_files_sent=df_files_sent.reset_index(drop=True)
+                        df_files_sent=df_files_sent.drop_duplicates()
+                        df_files_sent.to_csv(self.workpath+'/list_of_sent_files.csv')
+                        
+                        
+                        print('email sent: ' +   msg["Subject"] )
+                        nasc_done=nasc_done[n_files::]
+                        server.quit()
+    
+                    except Exception as e:
+                        print(e)
                                         
         
         self.callback_email_active==False
